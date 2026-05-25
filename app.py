@@ -108,7 +108,23 @@ with st.sidebar:
         
     api_key = st.text_input(api_key_label, value=env_api_key, type="password", help=env_help)
     
-    with st.expander("⚙️ Advanced Model Options"):
+    with st.expander("Azure Document Intelligence", expanded=True):
+        az_endpoint = st.text_input(
+            "Azure DI Endpoint",
+            value=os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", ""),
+            help="Required for reliable table extraction from all PDF types (digital & scanned)."
+        )
+        az_key = st.text_input(
+            "Azure DI Key",
+            value=os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY", ""),
+            type="password"
+        )
+        if az_endpoint and az_key:
+            st.success("Azure DI configured - will be used as primary extractor")
+        else:
+            st.warning("No Azure DI credentials - falling back to pdfplumber / vision LLM")
+
+    with st.expander("Advanced Model Options"):
         if provider == "Gemini":
             vision_model = st.text_input("Vision Model", value="gemini-2.0-flash")
             text_model = st.text_input("Text Model", value="gemini-2.0-flash")
@@ -133,7 +149,7 @@ with st.sidebar:
         st.metric("Reviewed", reviewed_records)
         
     st.markdown("---")
-    st.caption("Powered by Gemini 2.0, Nvidia Catalog & PyMuPDF")
+    st.caption("Powered by Azure Document Intelligence, Gemini 2.0 & PyMuPDF")
 
 # Header
 st.markdown('<div class="glowing-title">Comprehensive Financial Extraction Engine</div>', unsafe_allow_html=True)
@@ -310,7 +326,9 @@ with tab_ingest:
                         preprocess_photos=preprocess_photos,
                         provider=provider.lower(),
                         vision_model=vision_model,
-                        text_model=text_model
+                        text_model=text_model,
+                        az_endpoint=az_endpoint or None,
+                        az_key=az_key or None
                     )
                 except Exception as e:
                     result_list = None

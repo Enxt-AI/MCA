@@ -13,6 +13,14 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import time
 
+try:
+    from azure.ai.documentintelligence import DocumentIntelligenceClient
+    from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+    from azure.core.credentials import AzureKeyCredential
+    AZURE_DI_AVAILABLE = True
+except ImportError:
+    AZURE_DI_AVAILABLE = False
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -394,6 +402,134 @@ def extract_tables_text_fallback(pdf_path, page_num):
         print(f"  Error in text fallback extraction on page {page_num+1}: {e}")
     
     return rows
+
+
+def detect_fiscal_period_from_headers(header_texts):
+    """
+    Scans column header strings for a 4-digit year (e.g. '31 March 2024', '2023-24')
+    and returns (current_period, previous_period) as ('FY2024', 'FY2023').
+    Returns (None, None) if no year found.
+    """
+    years = []
+    for h in header_texts:
+        matches = re.findall(r'20\d{2}', str(h))
+        for m in matches:
+            yr = int(m)
+            if yr not in years:
+                years.append(yr)
+    years.sort(reverse=True)
+    if len(years) >= 2:
+        return f"FY{years[0]}", f"FY{years[1]}"
+    elif len(years) == 1:
+        return f"FY{years[0]}", f"FY{years[0]-1}"
+    return None, None
+
+
+def extract_tables_azure_di(pdf_path, az_endpoint, az_key):
+    """
+    Stage 2 (Azure DI path): Calls the Azure Document Intelligence Layout model
+    on the ENTIRE document in one API call.
+    Returns a dict: {page_number (0-indexed): [{"label": str, "values": [str, ...]}]}
+    Also returns detected column headers per page for fiscal year inference.
+    """
+    print("  [Azure DI] Submitting document to Layout model (whole-document, single call)...")
+    page_tables = {}   # {page_0idx: [{label, values}]}
+    page_headers = {}  # {page_0idx: [header strings]}
+    
+    if not AZURE_DI_AVAILABLE:
+        print("  [Azure DI] azure-ai-documentintelligence package not installed. Falling back.")
+        return page_tables, page_headers
+    
+    try:
+        client = DocumentIntelligenceClient(
+            endpoint=az_endpoint,
+            credential=AzureKeyCredential(az_key)
+        )
+        
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+        
+        poller = client.begin_analyze_document(
+            "prebuilt-layout",
+            body=pdf_bytes,
+            content_type="application/pdf"
+        )
+        result = poller.result()
+        
+        print(f"  [Azure DI] Received {len(result.tables) if result.tables else 0} tables from document.")
+        
+        for table in (result.tables or []):
+            # Get page number (Azure DI is 1-indexed, we use 0-indexed)
+            page_1idx = table.bounding_regions[0].page_number if table.bounding_regions else 1
+            page_0idx = page_1idx - 1
+            
+            if page_0idx not in page_tables:
+                page_tables[page_0idx] = []
+                page_headers[page_0idx] = []
+            
+            # Build a row_index -> col_index -> content grid
+            grid = {}
+            for cell in (table.cells or []):
+                r = cell.row_index
+                c = cell.column_index
+                if r not in grid:
+                    grid[r] = {}
+                grid[r][c] = cell.content.strip() if cell.content else ""
+                
+                # Collect header row content for fiscal year detection
+                if hasattr(cell, 'kind') and cell.kind == 'columnHeader':
+                    if cell.content and re.search(r'20\d{2}', cell.content):
+                        page_headers[page_0idx].append(cell.content)
+            
+            if not grid:
+                continue
+            
+            num_cols = max(max(row.keys()) for row in grid.values()) + 1
+            
+            # Identify header rows (row 0 usually) vs data rows
+            # Header detection: scan first 3 rows for year patterns
+            header_rows = set()
+            for r_idx in sorted(grid.keys())[:3]:
+                row_text = " ".join(grid[r_idx].values())
+                if re.search(r'20\d{2}', row_text) or any(
+                    kw in row_text.lower() for kw in ["particulars", "current year", "previous year", "march"]
+                ):
+                    header_rows.add(r_idx)
+                    # Extract years for fiscal period detection
+                    for cell_text in grid[r_idx].values():
+                        if re.search(r'20\d{2}', cell_text):
+                            page_headers[page_0idx].append(cell_text)
+            
+            # Build rows: first non-header column = label, rest = values
+            for r_idx in sorted(grid.keys()):
+                if r_idx in header_rows:
+                    continue
+                row = grid[r_idx]
+                if not row:
+                    continue
+                
+                label = row.get(0, "").strip()
+                if not label or len(label) < 2:
+                    continue
+                
+                # Skip purely numeric labels (note numbers, page numbers)
+                if re.match(r'^[\d\s\.]+$', label):
+                    continue
+                
+                values = [row.get(c, "") for c in range(1, num_cols)]
+                # Keep only non-empty value columns
+                values = [v for v in values if v.strip()]
+                
+                if values:  # Only add rows that have at least one value
+                    page_tables[page_0idx].append({"label": label, "values": values})
+        
+        print(f"  [Azure DI] Parsed tables across {len(page_tables)} pages.")
+        return page_tables, page_headers
+        
+    except Exception as e:
+        print(f"  [Azure DI] Error: {e}")
+        return {}, {}
+
 
 def extract_tables_scanned(pdf_path, page_num, api_key, provider="gemini", model_name=None, preprocess=False):
     """
@@ -829,8 +965,9 @@ def run_arithmetic_validation(statements_dict):
 
     return len(errors) == 0, errors
 
-def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False, 
-                provider="gemini", vision_model=None, text_model=None):
+def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
+                provider="gemini", vision_model=None, text_model=None,
+                az_endpoint=None, az_key=None):
     """
     Executes the entire 5-stage processing pipeline on the given PDF.
     Extracts P&L, Balance Sheet, and Cash Flow tables for Standalone and Consolidated.
@@ -878,13 +1015,41 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
     doc = fitz.open(pdf_path)
     company_name = doc.metadata.get("title") or os.path.basename(pdf_path).split("_")[0].upper()
     company_name = company_name.replace(".PDF", "").replace(".pdf", "")
-    
-    # Detect fiscal period
-    fiscal_period = "FY2024"
-    year_match = re.search(r"20\d{2}", os.path.basename(pdf_path))
-    if year_match:
-        fiscal_period = f"FY{year_match.group(0)}"
     doc.close()
+
+    # --- Azure DI: Run once on entire document if credentials provided ---
+    az_endpoint = az_endpoint or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+    az_key = az_key or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+    use_azure_di = bool(az_endpoint and az_key and AZURE_DI_AVAILABLE)
+
+    azure_page_tables = {}  # {page_0idx: [{label, values}]}
+    azure_page_headers = {} # {page_0idx: [header strings]}
+    if use_azure_di:
+        print("[Azure DI] Running Layout analysis on full document...")
+        azure_page_tables, azure_page_headers = extract_tables_azure_di(pdf_path, az_endpoint, az_key)
+    else:
+        print("[Extraction] Azure DI not configured. Using pdfplumber / vision LLM.")
+
+    # Detect fiscal period from Azure DI column headers (most reliable)
+    fiscal_period = "FY2024"
+    previous_period_override = None
+    if azure_page_headers:
+        all_headers = [h for headers in azure_page_headers.values() for h in headers]
+        fy_current, fy_previous = detect_fiscal_period_from_headers(all_headers)
+        if fy_current:
+            fiscal_period = fy_current
+            previous_period_override = fy_previous
+            print(f"[Fiscal Period] Detected from column headers: Current={fiscal_period}, Previous={previous_period_override}")
+        else:
+            print(f"[Fiscal Period] Could not detect from headers, using filename fallback.")
+            year_match = re.search(r"20\d{2}", os.path.basename(pdf_path))
+            if year_match:
+                fiscal_period = f"FY{year_match.group(0)}"
+    else:
+        year_match = re.search(r"20\d{2}", os.path.basename(pdf_path))
+        if year_match:
+            fiscal_period = f"FY{year_match.group(0)}"
+        print(f"[Fiscal Period] Using filename fallback: {fiscal_period}")
     
     # Process each section
     for section_name, pages in candidates.items():
@@ -905,14 +1070,30 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
             unit = detect_page_unit(page_text)
             
             table_rows = []
-            
-            if pdf_type == "digital":
+
+            if use_azure_di:
+                # --- Azure DI path: look up pre-extracted tables for this page ---
+                table_rows = azure_page_tables.get(page_num, [])
+                if table_rows:
+                    print(f"  [Azure DI] Using {len(table_rows)} pre-extracted rows for page {page_num+1}.")
+                else:
+                    print(f"  [Azure DI] No tables found for page {page_num+1} in Azure DI results.")
+                
+                # Also update unit from page headers if Azure DI found them
+                page_header_text = " ".join(azure_page_headers.get(page_num, []))
+                if page_header_text:
+                    detected_unit = detect_page_unit(page_header_text)
+                    if detected_unit != "INR_raw":
+                        unit = detected_unit
+
+            elif pdf_type == "digital":
+                # --- pdfplumber path ---
                 tables = extract_tables_digital(pdf_path, page_num)
                 for table in tables:
                     for row in table:
                         if len(row) >= 2:
                             table_rows.append({"label": row[0], "values": row[1:]})
-                
+
                 # Try text fallback if needed
                 if not table_rows:
                     print(f"  pdfplumber found no rows, trying text-based XBRL fallback...")
@@ -932,7 +1113,7 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
                         if text_rows:
                             table_rows = text_rows
             else:
-                # Scanned vision extraction
+                # --- Scanned vision LLM path ---
                 scanned_extracted = extract_tables_scanned(
                     pdf_path, page_num, api_key, provider=provider, model_name=vision_model, preprocess=preprocess_photos
                 )
@@ -1094,7 +1275,7 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
     
     # Group statements by (type, period)
     # where period is current_period or previous_period
-    previous_period = get_previous_period(fiscal_period)
+    previous_period = previous_period_override or get_previous_period(fiscal_period)
     
     # Structured container: {(type, period): {income_statement: {}, balance_sheet: {}, cash_flow: {}}}
     synthesized = {}
