@@ -1333,12 +1333,21 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
             if current_item is None:
                 synthesized[key][sec][field] = item
             else:
-                # Merge if values match, otherwise keep first
-                if abs(current_item["value"] - item["value"]) > 0.01:
-                    all_conflicts.append(f"Conflict for {field} in {t} {p}")
+                # Merge if values match, otherwise keep first/non-None value
+                val1 = current_item["value"]
+                val2 = item["value"]
+                if val1 is None and val2 is None:
+                    pass
+                elif val1 is None:
+                    current_item["value"] = val2
+                elif val2 is None:
+                    pass
                 else:
-                    if frag["page"] not in current_item["source_pages"]:
-                        current_item["source_pages"].append(frag["page"])
+                    if abs(val1 - val2) > 0.01:
+                        all_conflicts.append(f"Conflict for {field} in {t} {p}")
+                    else:
+                        if frag["page"] not in current_item["source_pages"]:
+                            current_item["source_pages"].append(frag["page"])
                         
     # Run derived calculations & validation for each statement group
     output_statements = []
