@@ -12,6 +12,10 @@ load_dotenv()
 import database
 import pipeline
 
+# Initialize database tables on startup
+database.init_db()
+
+
 st.set_page_config(
     page_title="Financial Statement Extraction Engine",
     page_icon="📊",
@@ -108,21 +112,10 @@ with st.sidebar:
         
     api_key = st.text_input(api_key_label, value=env_api_key, type="password", help=env_help)
     
-    with st.expander("Azure Document Intelligence", expanded=True):
-        az_endpoint = st.text_input(
-            "Azure DI Endpoint",
-            value=os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", ""),
-            help="Required for reliable table extraction from all PDF types (digital & scanned)."
-        )
-        az_key = st.text_input(
-            "Azure DI Key",
-            value=os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY", ""),
-            type="password"
-        )
-        if az_endpoint and az_key:
-            st.success("Azure DI configured - will be used as primary extractor")
-        else:
-            st.warning("No Azure DI credentials - falling back to pdfplumber / vision LLM")
+    # Azure DI is hidden as per user request
+    az_endpoint = None
+    az_key = None
+
 
     with st.expander("Advanced Model Options"):
         if provider == "Gemini":
@@ -149,7 +142,7 @@ with st.sidebar:
         st.metric("Reviewed", reviewed_records)
         
     st.markdown("---")
-    st.caption("Powered by Azure Document Intelligence, Gemini 2.0 & PyMuPDF")
+    st.caption("Powered by Gemini 2.0 & PyMuPDF")
 
 # Header
 st.markdown('<div class="glowing-title">Comprehensive Financial Extraction Engine</div>', unsafe_allow_html=True)
