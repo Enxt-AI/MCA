@@ -196,7 +196,8 @@ def init_db():
             "non-current borrowings", "current borrowings", "total borrowings",
             "loans", "term loans", "bank loans", "financial liabilities - borrowings",
             "non-current financial liabilities - borrowings", "current financial liabilities - borrowings",
-            "total loans", "secured loans", "unsecured loans"
+            "total loans", "secured loans", "unsecured loans",
+            "borrowings, non-current", "borrowings, current"
         ],
         "trade_payables": [
             "trade payables", "sundry creditors", "payables", "current financial liabilities - trade payables",
@@ -206,7 +207,7 @@ def init_db():
             "total outstanding dues of creditors other than micro enterprises",
             "trade payables (current)", "current - trade payables",
             "payables - trade payables", "trade payables total",
-            "total payables"
+            "total payables", "trade payables, current"
         ],
         
         # --- CASH FLOW STATEMENT ---
