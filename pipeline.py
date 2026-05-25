@@ -229,12 +229,13 @@ def clean_numeric_value(val_str):
     """
     Converts a string representation of a financial value into a float/int.
     Handles commas, parentheses for negative numbers, spaces, and currency symbols.
+    Returns None for empty, dash, or non-parseable strings (not 0.0).
     """
     if val_str is None:
         return None
     val_str = str(val_str).strip().lower()
-    if not val_str or val_str in ("-", "nil", "null", "none", "n.a.", "na", "—"):
-        return 0.0
+    if not val_str or val_str in ("-", "nil", "null", "none", "n.a.", "na", "—", ""):
+        return None
         
     # Check if negative denoted by parenthesis (e.g. (1,234.56)) or minus sign
     is_negative = False
@@ -245,7 +246,7 @@ def clean_numeric_value(val_str):
     cleaned = re.sub(r"[^\d.]", "", val_str)
     
     if not cleaned:
-        return 0.0
+        return None
         
     try:
         value = float(cleaned)
@@ -253,7 +254,7 @@ def clean_numeric_value(val_str):
             value = -value
         return value
     except ValueError:
-        return 0.0
+        return None
 
 def detect_page_unit(page_text):
     """
@@ -1017,39 +1018,73 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
     company_name = company_name.replace(".PDF", "").replace(".pdf", "")
     doc.close()
 
-    # --- Azure DI: Run once on entire document if credentials provided ---
-    az_endpoint = az_endpoint or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-    az_key = az_key or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+    # Azure DI is opt-in ONLY — only used if both args are explicitly passed in
+    # (not pulled from env). This keeps the default path as pdfplumber + XBRL fallback.
     use_azure_di = bool(az_endpoint and az_key and AZURE_DI_AVAILABLE)
 
-    azure_page_tables = {}  # {page_0idx: [{label, values}]}
-    azure_page_headers = {} # {page_0idx: [header strings]}
+    azure_page_tables = {}
+    azure_page_headers = {}
     if use_azure_di:
         print("[Azure DI] Running Layout analysis on full document...")
         azure_page_tables, azure_page_headers = extract_tables_azure_di(pdf_path, az_endpoint, az_key)
     else:
-        print("[Extraction] Azure DI not configured. Using pdfplumber / vision LLM.")
+        print("[Extraction] Using pdfplumber + XBRL text fallback.")
 
-    # Detect fiscal period from Azure DI column headers (most reliable)
+    # --- Detect fiscal period from actual page text (not filename) ---
+    # Scan all candidate financial statement pages for real date patterns
     fiscal_period = "FY2024"
     previous_period_override = None
-    if azure_page_headers:
+
+    if use_azure_di and azure_page_headers:
         all_headers = [h for headers in azure_page_headers.values() for h in headers]
         fy_current, fy_previous = detect_fiscal_period_from_headers(all_headers)
         if fy_current:
             fiscal_period = fy_current
             previous_period_override = fy_previous
-            print(f"[Fiscal Period] Detected from column headers: Current={fiscal_period}, Previous={previous_period_override}")
+            print(f"[Fiscal Period] Detected from Azure DI headers: Current={fiscal_period}, Previous={previous_period_override}")
+    else:
+        # Scan the text of all detected financial statement pages for year patterns
+        all_candidate_pages = [
+            p for pages in candidates.values() for p in pages
+        ]
+        years_found = []
+        try:
+            doc = fitz.open(pdf_path)
+            for pg in all_candidate_pages[:10]:  # check first 10 candidates max
+                pg_text = doc[pg].get_text()
+                # Look for patterns like "31 March 2024", "March 31, 2024", "31st March, 2024"
+                date_matches = re.findall(
+                    r'(?:31\s*(?:st|rd)?\s*march[,]?\s*|march\s+31[,]?\s*)(20\d{2})',
+                    pg_text, re.IGNORECASE
+                )
+                # Also look for bare year in header context: "Year ended 31 March 2024"
+                header_matches = re.findall(
+                    r'(?:year ended|period ended|as at|as on)[^\n]{0,30}(20\d{2})',
+                    pg_text, re.IGNORECASE
+                )
+                for m in date_matches + header_matches:
+                    yr = int(m)
+                    if yr not in years_found:
+                        years_found.append(yr)
+            doc.close()
+        except Exception:
+            pass
+
+        years_found.sort(reverse=True)
+        if len(years_found) >= 2:
+            fiscal_period = f"FY{years_found[0]}"
+            previous_period_override = f"FY{years_found[1]}"
+            print(f"[Fiscal Period] Detected from page text: Current={fiscal_period}, Previous={previous_period_override}")
+        elif len(years_found) == 1:
+            fiscal_period = f"FY{years_found[0]}"
+            previous_period_override = f"FY{years_found[0]-1}"
+            print(f"[Fiscal Period] Detected from page text: Current={fiscal_period}, Previous={previous_period_override}")
         else:
-            print(f"[Fiscal Period] Could not detect from headers, using filename fallback.")
+            # Last resort: filename (known to be unreliable for XBRL filings)
             year_match = re.search(r"20\d{2}", os.path.basename(pdf_path))
             if year_match:
                 fiscal_period = f"FY{year_match.group(0)}"
-    else:
-        year_match = re.search(r"20\d{2}", os.path.basename(pdf_path))
-        if year_match:
-            fiscal_period = f"FY{year_match.group(0)}"
-        print(f"[Fiscal Period] Using filename fallback: {fiscal_period}")
+            print(f"[Fiscal Period] Fallback from filename: {fiscal_period} (may be inaccurate for XBRL filings)")
     
     # Process each section
     for section_name, pages in candidates.items():

@@ -65,95 +65,148 @@ def init_db():
             "revenue from operations", "revenue", "sales", "turnover", "net sales",
             "income from operations", "revenue from contracts with customers",
             "net revenue from operations", "sale of products", "sale of services",
-            "revenue from operations (gross)", "revenue from operations (net)"
+            "revenue from operations (gross)", "revenue from operations (net)",
+            "total revenue from operations", "gross revenue", "revenue from operation",
+            "income from sale of products", "income from sale of services",
+            "revenue from contracts with customers (gross)"
         ],
         "cost_of_materials": [
             "cost of materials consumed", "cost of raw materials consumed", "raw material consumed",
             "consumption of raw materials", "cost of materials", "cogs", "cost of goods sold",
             "materials consumed", "raw materials consumed", "cost of material consumed",
-            "purchases of stock-in-trade", "purchase of stock-in-trade", "purchases of stock in trade"
+            "purchases of stock-in-trade", "purchase of stock-in-trade", "purchases of stock in trade",
+            "cost of material and components consumed", "material cost",
+            "total cost of materials consumed"
         ],
         "change_in_inventory": [
             "changes in inventories of finished goods, work-in-progress and stock-in-trade",
             "changes in inventories of finished goods and work-in-progress",
             "change in inventories", "changes in inventories", "decrease / (increase) in inventories",
             "decrease/(increase) in inventories", "inventory change", "changes in inventories of finished goods",
-            "total changes in inventories of finished goods, work-in-progress and stock-in-trade"
+            "total changes in inventories of finished goods, work-in-progress and stock-in-trade",
+            "(increase)/decrease in inventories", "increase/(decrease) in inventories"
         ],
         "employee_benefit_expenses": [
             "employee benefits expense", "employee benefit expense", "employee benefits expenses",
             "staff costs", "staff cost", "salaries and wages", "salaries, wages and bonus",
-            "personnel expenses", "employee cost", "employee costs"
+            "personnel expenses", "employee cost", "employee costs",
+            "total employee benefits expense", "wages, salaries and bonus",
+            "manpower cost", "human resource cost"
         ],
         "other_expenses": [
             "other expenses", "other expense", "administrative expenses", "selling and distribution expenses",
-            "manufacturing expenses", "other operating expenses", "operating expenses"
+            "manufacturing expenses", "other operating expenses", "operating expenses",
+            "total other expenses", "selling, general and administrative expenses",
+            "general and administrative expenses", "miscellaneous expenses"
         ],
         "other_income": [
             "other income", "non-operating income", "other non-operating income",
-            "interest income", "dividend income", "other operating income"
+            "interest income", "dividend income", "other operating income",
+            "total other income", "miscellaneous income", "other revenues"
         ],
         "depreciation_amortization": [
             "depreciation and amortisation expense", "depreciation and amortization expense",
             "depreciation and amortisation", "depreciation and amortization",
-            "depreciation & amortisation", "depreciation, amortisation and impairment"
+            "depreciation & amortisation", "depreciation, amortisation and impairment",
+            "total depreciation and amortisation expense", "depreciation",
+            "amortisation", "amortization", "depreciation on tangible assets"
         ],
         "finance_cost": [
             "finance costs", "finance cost", "interest and finance charges", "interest expenses",
-            "finance costs and interest expense", "interest expense"
+            "finance costs and interest expense", "interest expense",
+            "total finance costs", "borrowing costs", "interest on borrowings",
+            "interest and borrowing costs"
         ],
         "pbt": [
             "profit before tax", "profit / (loss) before tax", "profit before exceptional items and tax",
-            "total profit before tax", "profit/(loss) before tax", "pbt", "profit before tax and exceptional items"
+            "total profit before tax", "profit/(loss) before tax", "pbt", "profit before tax and exceptional items",
+            "profit before taxation", "income before tax", "earnings before tax",
+            "profit / loss before tax", "profit before income tax",
+            "profit (loss) before tax", "profit or loss before tax"
         ],
         "tax": [
             "tax expense", "tax expenses", "total tax expense", "provision for tax", "current tax",
-            "deferred tax", "current tax expense", "deferred tax expense", "tax expense (current & deferred)"
+            "deferred tax", "current tax expense", "deferred tax expense", "tax expense (current & deferred)",
+            "income tax expense", "total income tax expense", "provision for income tax",
+            "tax expense for the year", "taxation"
         ],
         "pat": [
             "profit after tax", "profit for the year", "profit for the period", "pat",
             "net profit after tax", "profit / (loss) for the year", "profit / (loss) for the period",
-            "profit/(loss) for the year", "total profit for the period", "net profit"
+            "profit/(loss) for the year", "total profit for the period", "net profit",
+            "profit / loss after tax", "profit (loss) for the year",
+            "profit or loss for the year", "profit after income tax",
+            "net income", "total comprehensive income for the year",
+            "profit after tax for the year", "net profit for the year",
+            "profit/(loss) after tax", "profit / (loss) after tax"
         ],
         "eps_basic": [
-            "eps basic", "basic eps", "basic earnings per share", "basic", "earnings per equity share - basic"
+            "eps basic", "basic eps", "basic earnings per share", "basic", "earnings per equity share - basic",
+            "basic earnings per equity share", "eps - basic"
         ],
         "eps_diluted": [
-            "eps diluted", "diluted eps", "diluted earnings per share", "diluted", "earnings per equity share - diluted"
+            "eps diluted", "diluted eps", "diluted earnings per share", "diluted", "earnings per equity share - diluted",
+            "diluted earnings per equity share", "eps - diluted"
         ],
         
         # --- BALANCE SHEET ---
         "fixed_assets": [
             "property, plant and equipment", "tangible assets", "net block", "fixed assets",
-            "property, plant & equipment", "property, plant and equipment (net)", "fixed assets (net)"
+            "property, plant & equipment", "property, plant and equipment (net)", "fixed assets (net)",
+            "total property, plant and equipment", "net fixed assets",
+            "property plant and equipment", "plant and machinery"
         ],
         "cwip": [
-            "capital work-in-progress", "capital work in progress", "cwip", "capital wip"
+            "capital work-in-progress", "capital work in progress", "cwip", "capital wip",
+            "capital work-in-progress (cwip)", "capital work in progress (cwip)"
         ],
         "investments": [
-            "non-current investments", "long term investments", "investments", "non-current financial assets - investments"
+            "non-current investments", "long term investments", "investments", "non-current financial assets - investments",
+            "financial assets - investments", "total investments", "investment in subsidiaries",
+            "investment in associates", "current investments", "mutual funds",
+            "investment in equity instruments", "investment in debt instruments"
         ],
         "trade_receivables": [
-            "trade receivables", "sundry debtors", "receivables", "current financial assets - trade receivables"
+            "trade receivables", "sundry debtors", "receivables", "current financial assets - trade receivables",
+            "total trade receivables", "trade and other receivables",
+            "debtors", "accounts receivable", "bills receivable",
+            "trade receivables (current)", "current - trade receivables"
         ],
         "inventory": [
-            "inventories", "inventory", "stock", "stocks", "inventories (current)"
+            "inventories", "inventory", "stock", "stocks", "inventories (current)",
+            "total inventories", "raw materials", "work-in-progress", "finished goods",
+            "stock in trade", "stores and spares"
         ],
         "share_capital": [
-            "share capital", "equity share capital", "paid up share capital", "issued and paid up capital"
+            "share capital", "equity share capital", "paid up share capital", "issued and paid up capital",
+            "total share capital", "paid-up equity share capital", "issued, subscribed and paid up capital",
+            "issued subscribed and paid up"
         ],
         "face_value": [
             "face value", "par value", "nominal value", "face value per share"
         ],
         "reserves_surplus": [
-            "reserves and surplus", "other equity", "reserves & surplus", "retained earnings"
+            "reserves and surplus", "other equity", "reserves & surplus", "retained earnings",
+            "total other equity", "total reserves and surplus", "reserves",
+            "other reserves", "surplus in statement of profit and loss",
+            "securities premium", "retained earnings / (deficit)"
         ],
         "borrowings": [
             "borrowings", "long-term borrowings", "short-term borrowings", "current maturities of long-term debt",
-            "non-current borrowings", "current borrowings"
+            "non-current borrowings", "current borrowings", "total borrowings",
+            "loans", "term loans", "bank loans", "financial liabilities - borrowings",
+            "non-current financial liabilities - borrowings", "current financial liabilities - borrowings",
+            "total loans", "secured loans", "unsecured loans"
         ],
         "trade_payables": [
-            "trade payables", "sundry creditors", "payables", "current financial liabilities - trade payables"
+            "trade payables", "sundry creditors", "payables", "current financial liabilities - trade payables",
+            "total trade payables", "trade and other payables",
+            "creditors", "accounts payable", "bills payable",
+            "total outstanding dues of micro enterprises and small enterprises",
+            "total outstanding dues of creditors other than micro enterprises",
+            "trade payables (current)", "current - trade payables",
+            "payables - trade payables", "trade payables total",
+            "total payables"
         ],
         
         # --- CASH FLOW STATEMENT ---
