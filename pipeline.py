@@ -855,16 +855,23 @@ def process_pdf(pdf_path, api_key, target_pages=None, preprocess_photos=False,
     
     # Category mappings
     PL_FIELDS = [
-        "revenue", "cost_of_materials", "change_in_inventory", "employee_benefit_expenses",
-        "other_expenses", "other_income", "depreciation_amortization", "finance_cost", "pbt", "tax", "pat", "eps_basic", "eps_diluted"
+        "revenue", "cost_of_materials", "change_in_inventory", "gross_profit", "gross_margin_pct",
+        "employee_benefit_expenses", "other_expenses", "ebitda", "ebitda_margin_pct",
+        "depreciation_amortization", "ebit", "ebit_margin_pct", "other_income", "finance_cost",
+        "pbt", "tax", "pat", "net_profit_margin_pct", "eps_basic", "eps_diluted"
     ]
     BS_FIELDS = [
-        "fixed_assets", "cwip", "investments", "trade_receivables", "inventory", "share_capital", "face_value", "reserves_surplus", "borrowings", "trade_payables"
+        "fixed_assets", "cwip", "investments", "trade_receivables", "inventory",
+        "other_assets", "total_assets", "share_capital", "face_value", "reserves_surplus",
+        "borrowings", "trade_payables", "other_liabilities"
     ]
     CF_FIELDS = [
-        "opbwc", "change_in_receivables", "change_in_inventories", "change_in_payables", "other_working_capital_changes",
-        "cash_generated_from_ops", "tax_paid", "cash_flow_from_operations", "purchase_of_ppe", "sale_of_ppe", "cash_flow_from_investing",
-        "borrowings_net", "dividend_paid", "equity_raised", "other_financing_activities", "cash_flow_from_financing", "net_cash_generated", "cash_at_start", "cash_at_end"
+        "opbwc", "change_in_receivables", "change_in_inventories", "change_in_payables",
+        "other_working_capital_changes", "working_capital_change", "cash_generated_from_ops",
+        "tax_paid", "cash_flow_from_operations", "purchase_of_ppe", "sale_of_ppe",
+        "cash_flow_from_investing", "borrowings_net", "dividend_paid", "equity_raised",
+        "other_financing_activities", "cash_flow_from_financing", "net_cash_generated",
+        "cash_at_start", "cash_at_end"
     ]
     
     # Stage 1: Classify PDF
